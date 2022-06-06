@@ -1,0 +1,1288 @@
+
+
+---
+title: "Building a Fourth Down Prediction Model"
+author: "Luke Fields\n  "
+date: "UCSB Spring 2022"
+output:
+  html_document:
+    toc: yes
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+    theme: united
+subtitle: Using Machine Learning Models to Predict 4th Down Decisions in the NFL
+---
+
+![](/Users/lukefields/Desktop/Fourthdown-Project/Images/image(1).jpg)
+
+\newpage
+
+# Introduction
+
+The aim of this project is to build a machine learning model that can predict whether or not an NFL team will go for it on 4th down. We will be using data from `nflfastr`, and implementing multiple techniques to yield the most accurate model for this binary classification problem. Let's go for it!
+
+##### Loading Packages and Setting Up The Environment
+```{r setup, message = FALSE}
+library(corrplot)  # for the correlation plot
+library(discrim)  # for linear discriminant analysis
+library(corrr)   # for calculating correlation
+library(knitr)   # to help with the knitting process
+library(MASS)    # to assist with the markdown processes
+library(tidyverse)   # using tidyverse and tidymodels for this project mostly
+library(tidymodels)
+library(ggplot2)   # for most of our visualizations
+library(ggrepel)
+library(ggimage)
+library(rpart.plot)  # for visualizing trees
+library(vip)         # for variable importance 
+library(vembedr)     # for embedding links
+library(janitor)     # for cleaning out our data
+library(randomForest)   # for building our randomForest
+library(stringr)    # for matching strings
+library("dplyr")     # for basic r functions
+library("yardstick") # for measuring certain metrics
+tidymodels_prefer()
+
+knitr::opts_chunk$set(   # basic chunk settings
+	echo = TRUE,
+	fig.height = 5,
+	fig.width = 7,
+	tidy = TRUE,
+	tidy.opts = list(width.cutoff = 60)
+)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+options(digits = 4)
+
+
+indent1 = '    '        # basic indent settings
+indent2 = '        '
+indent3 = '            '
+# With that being said, let's get working!
+```
+
+
+
+## What is 4th Down in the NFL? 
+
+In the [National Football League](https://www.nfl.com/), teams move the ball on offense in an effort to score more points than the other team. Each possession, a team gets 4 plays to move the ball a net 10 yards in order to get a "first down". If a team does not convert a first down or touchdown, then the other team gets the ball. So, on 4th down, teams are faced with a decision: conservatively take less points or aggressively try and score more in a risky fashion. If a team attempts to secure a 4th down conversion but fails, then the other team automatically takes over from where the team on offense failed to execute. If a team does secure a 4th down conversion, then they can keep their drive going towards a touchdown, or sometimes even score a touchdown if they are close enough. Because of the high-risk, high-reward nature of this circumstance in football, 4th down decisions and plays provide for some of the most exciting and memorable moments there are to witness as an NFL fan. \hfill \break
+
+<center>
+
+<video width="600" height="340" controls>
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/NGS_Decision_Guide.mp4" type="video/mp4">
+  
+</video>
+
+</center> \hfill \break
+
+
+
+
+## Why is this model relevant?
+
+For nearly all of NFL history, it was up to the head coach or quarterback to decide whether the risk of going for it was worth it. Recently, there has been an analytics revolution for this decision, as teams are now implementing computers and machine learning models to help aid their 4th down discussions. In fact, organizations like Amazon have partnered with the NFL to implement their AWS technology to present a "Next Gen Stats Decision Guide". A lot of these models are a guide for teams to make their decision easier using statistical probabilities and data, but my model puts a spin on that. Instead of building a model that helps NFL teams judgement on 4th down, I want to create something that gives opposing teams, or fans spectating the game, an idea of whether the team with the ball will be going for it on the 4th down play in front of their eys. By doing so, I hope to improve the average NFL fan's knowledge of football analytics and make the presence of statistical figures in the NFL a helpful tool to anyone interested. \hfill \break
+
+
+
+
+## Project Roadmap
+
+Now that we know the background and importance of our model, let's discuss how we are going to build it throughout this project. There will need to be some initial data manipulation and cleaning, and then we will perform some exploratory data analysis to get a further detailed idea on our variables and aim. Our goal is to use other predictor variables to predict a binary class "Go For It", which will be our response variable detailing whether a team goes for it or not on 4th down. We will then perform a training/test split on our data, make a recipe, and set folds for the 10-fold cross validation we will implement. Logistic Regression, Linear Discriminant Analysis, Quadratic Discriminant Analysis, Lasso, Decision Tree, and Random Forest, and K-Nearest Neighbor models will be all used to model the training data when we finish the setup. Whichever model performs the strongest, we will then fit to our testing data set and analyze how effective our model can truly be. Ready! Set-Hut! \hfill \break
+
+<center>
+
+![](/Users/lukefields/Desktop/Fourthdown-Project/Images/tom-brady-4th-down.gif)
+
+<c/enter>
+
+
+
+# Exploratory Data Analysis 
+
+Before we can do any modeling, we have to take a look at what our data really looks like. When we load our data, not everything is going to be perfect and ready for application. There can be some variables that might need to converted to factors, or some missing values that might need to be cleaned. We know we are going to want our response variable to be a value that defines whether or not a team went for it, or if they did not, but we still have to create this variable. In this section, there will be some manipulation and tidying of our data before we analyze some of the key variables using visualizations and other functions. 
+
+
+
+## Loading and Exploring Raw Data
+
+The way we will be obtaining our data for this project is through [nflfastr](https://www.nflfastr.com/index.html), which is a package that contains play-by-play data for nearly every NFL play that has happened since 1999. We will load the package first. 
+```{r class.source = "fold-show"}
+library(nflfastR) # loading the nflfastR package
+options(scipen = 9999)
+```
+
+
+Now that we have our package that allows us to effectively scrape NFL data, we will load play-by-play data over the past 10 years available, from the 2011 to 2020 season. We will now manipulate the data from 2011-2020 to get it all cleaned and ready for modeling as a csv file. \hfill \break
+```{r class.source = "fold-show"}
+pbp_data <- nflreadr::load_pbp(2011:2021) # loading the pbp data from 2011 to 2021
+
+pbp_data %>%
+  head()
+```
+
+How big is this data set that we have to work with now?  \hfill \break
+```{r class.source = "fold-show"}
+dim(pbp_data) # getting the dimensions of our data 
+```
+Over 50,000 observations and exactly 372 variables; that is a pretty big dataset. We obviously are not going to need to use all of these predictor variables. Let's do some more manipulation to get a better idea of where we need to go. \hfill \break
+
+
+We only need data from offensive possessions, meaning plays that are not kickoffs or other special teams plays, so we will filter our data accordingly.  \hfill \break
+```{r class.source = "fold-show"}
+pbp_offense <- pbp_data %>%  # getting our dataset to be offense only 
+  filter(!is.na(down))
+```
+
+To get an idea of how much we need our data to be trimmed, let's graph the distribution of downs played in the NFL. In other words, the figure below shows the general amount of plays that have taken place on 1st, 2n, 3rd, and 4th down between 2011-2020. \hfill \break
+```{r}
+down_plot <- ggplot(pbp_offense, aes(x= down)) + geom_histogram(bins = "4", color = "#FB4F14")
+down_plot + ggtitle("Distribution of Downs Played from 2011 - 2020") +
+  xlab("Down") + ylab("Amount of Plays")
+```
+Ok, as expected, the earlier downs feature more plays, but they are irrelevant to this project. Therefore, more data manipulation has to be done. 
+
+## Morphing Our Data
+
+This project is centered solely around the 4th down play, so let's filter out the data to only include plays that take place on 4th down. \hfill \break 
+```{r class.source = "fold-show"}
+pbp_4th_down <- pbp_offense %>%  # Getting just 4th down data
+  filter(down == 4)
+```
+
+
+That's more like it. We will want to add a few variables though. First, we will create our response variable, which we will call `go_for_it`. Essentially, if no play occurred or the play is a punt or field goal, then the team did not go for it. But, if the team performed a run or pass on 4th down, then they went for it! The below code will mutate our data set to add this precious variable. Another variable that is not in this data set is whether the team with the ball is at home or not. with home field advantage and crowd presence playing such a huge part in a team's decision, this is probably going to be helpful in our model. If a team is tied up in the 4th quarter in an important game and the crowd starts chanting "Go For It" and cheering loudly, the coach and players will want to appease the fans and make the exciting decision. \hfill \break
+```{r class.source = "fold-show"}
+pbp_4th_down_w_go4it <- pbp_4th_down %>%  # assigning a 0 to ST plays, and a 1 to OFF plays
+  mutate(go_for_it = case_when(play_type == "punt" ~ 0,
+                               play_type == "no_play" ~ 0,
+                               play_type == "field_goal" ~ 0,
+                               play_type == "pass" ~ 1,
+                               play_type == "run" ~ 1))
+
+pbp_4th_down_w_go4it_home <- pbp_4th_down_w_go4it %>% # adding the "home" variable
+  mutate(home = if_else(posteam == home_team, 1, 0))
+```
+
+
+Because our data set is so large, we can afford to eliminate missing observations instead of filling them with other values. I went ahead and completed the process of removing NA values and then selecting the variables that will be important for this project, and then that data set was written to a CSV file which is called 'fourthdown'. Selecting variables to keep out of the 372 available was a fairly easy process because I have such a strong familiarity with the NFL and what is important before an NFL play. Similarly, any variable that relates to information during or after the play has already occurred will be irrelevant, as we are trying to predict what will happen right as the ball is snapped. I trimmed the data down to 21 key variables, with 20 of them being predictors and 1 being `go_for_it`, our response variables. The variables that I selected for the true data set are as following: \hfill \break
+
+* `posteam`: String abbreviation of the team that has the ball on offense (e.g. CIN for Cincinnati Bengals)
+
+* `defteam`: String abbreviation of the team that has the ball on defense (e.g. CIN for Cincinnati Bengals)
+
+* `season`: Year of the season for the play (between 2011 - 2020 seasons)
+
+* `season_type`: REG for regular season, and POST for playoffs
+
+* `week`: Which week of the season the play is happening in (between Week 1 and 21 (Super Bowl) )
+
+* `yardline_100`: Where the play is taking place on the field; yard location (e.g. 73 for own 27 yard-line, 1 for opponents 1 yard line)
+
+* `quarter_seconds_remaining`: How many seconds left in the quarter before the ball is snapped (e.g. 132 for 2:32 left in the quarter)
+
+* `half_seconds_remaining`: How many seconds left in the half before the ball is snapped (e.g. 960 for 1:00 left in the first quarter)
+
+* `game_seconds_remaining`: how many seconds left in the game before the ball is snapped (e.g. 1920 for 2:00 left in the second quarter)
+
+* `qtr`: Which quarter the play is taking place in (e.g. 2 for 2nd quarter)
+
+* `goal_to_go`: gives a 1 if the team on offense is in a goal to go situation (inside the 10 yard line), or a 0 if they are not
+
+* `ydstogo`: How many yards left for the first down (e.g. 3 for 4th and 3)
+
+* `home_timeouts_remaining`: How many timeouts the home team has (1, 2, or 3)
+
+* `away_timeouts_remaining`: How many timeouts the away team has (1, 2, or 3)
+
+* `posteam_score`: The score of the team on offense (e.g. 27 if the team with possession has 27 points)
+
+* `defteam_score`: The score of the team on defense (e.g. 23 if the team on defnse has 23 points)
+
+* `score_differential`: The score different between the team on offense and the team on defense (e.g. -4 if the score is 23-27)
+
+* `wind`: Miles per hour of the wind before the ball is snapped (e.g. 31 if the wind is blowing at 31 mph)
+
+* `temp`: Temperature in farenhit  before the ball is snapped (e.g. 76 if the temperature if 76 degrees F)
+
+* `go_for_it`: Gives 1 if the team decides to go for the 4th down conversion, gives a 0 if the team does not go for (This is what we will be predicting)
+
+* `home`: Gives 1 if the team with possession is at home, gives a 0 if the team is on the road 
+
+
+## Tidying Our Data 
+Now we have the exact data we will be working with throughout this project. Let's read the CSV file and take a peek! \hfill \break
+```{r class.source = "fold-show"}
+fourthdown <- read_csv("~/Desktop/Fourthdown-Project/Data/pbp4th.csv")  # reading our data!
+
+fourthdown %>%
+  head()
+
+dim(fourthdown)
+```
+It looks exactly like what we want, and a data set with over 30,000 observations is going to be more than sufficient for our model to learn effectively! \hfill \break
+
+We want numerical values like home (0 or 1) and season to be of categorical type, so we will factorize those two and three others accordingly using the below code. \hfill \break
+```{r class.source = "fold-show"}
+# Assigning 5 different variables to be of factor type
+fourthdown$goal_to_go <- as.factor(fourthdown$goal_to_go) 
+fourthdown$season_type <- as.factor(fourthdown$season_type)
+fourthdown$go_for_it <- as.factor(fourthdown$go_for_it)
+fourthdown$home <- as.factor(fourthdown$home)
+fourthdown$season <- as.factor(fourthdown$season)
+```
+
+
+
+## Visual EDA
+
+Our data is ready to go for it, (no pun intended)! Before we start the juicy stuff and run our models, let's take a look at the effect some of our variables have on teams "Go For It" decisions using ggplot visualizations. Being a die hard Cincinnati Bengals fan, of course we have to use orange and black to define a lot of our graphs' color schemes. 
+
+### Variable Correlation Plot
+
+First, let's do a correlation heat map of the numeric variables to get an idea of their relationship. \hfill \break
+```{r}
+fourthdown_numer <- fourthdown %>%  # getting just the numeric data
+  select_if(is.numeric)
+
+fourthdown_cor <- cor(fourthdown_numer)  # calculating the correlation between each variable
+fourthdown_cor_plt <- corrplot(fourthdown_cor,  # making the correlation plot
+                               order = 'AOE',
+                               col = COL2("PiYG")) # Pink and Green color combo
+```
+I was a little surprised at first that there is such little correlation between a lot of our predictor variables, but after further analysis between each variable, it makes more sense. Obviously, variables relating to time like seconds remaining in a quarter and seconds remaining in a game are going to have positive correlation, and the higher a score differential is usually means the team with possession is going to have a high score as well. Meanwhile, variables like week of the game and quarter the play is taking place in should have no correlation at all, and that is exemplified by this graph. 
+
+
+What if we do a boxplot of the score_differential?\hfill \break
+```{r}
+ggplot(fourthdown, aes(score_differential)) +  # box plot of the score_differential in our dataset
+  geom_boxplot(fill = "#FB4F14")
+```
+
+Now, we will create a bar-plot for a significant amount of predictors to examine their relationship with our predictor, `go_for_it`, to get an idea of what values are going to significantly alter our model. \hfill \break
+
+
+### Season
+First up, we have the change in go_for_it rates over time in the 10 years that our data set is working with. We can see that every year, more and more teams are going for it on 4th down, even if less 4th down plays are actually occurring. In fact, 2020 had the highest amount of teams going for it, but the fewest amount of plays within our data set on 4th down. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by season
+ggplot(fourthdown, aes(season)) + 
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```
+
+
+### Yardline
+We can see from this plot that a significant amount of plays occur in a team's own side of the field, and they rarely go for it if they have not crossed midfield yet. When teams are hovering around field goal range between the 30 and 40 yard line, but may not have much confidence in their kicker, they will go for it at a good rate in this portion of the field. The most significant area of the field where teams go for it is on the goal line, with over half of all 4th down plays from the 1 yard line being an attempt to go for it! \hfill \break
+```{r}
+# Barplot of difference in go_for_it by yardline
+ggplot(fourthdown, aes(yardline_100)) + 
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```
+
+
+### Quarter Seconds Remaining
+There is not that much of a relation between teams going for it and how much time is left in the quarter, except it is apparent that more teams go for it as the quarter is coming to a close instead of at the beginning. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by quarter seconds remaining
+ggplot(fourthdown, aes(quarter_seconds_remaining)) + 
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```
+
+### Half Seconds Remaining
+From this graph, it is apparent that very few teams go for it at the beginning of the half, and tend to increase their rate of going for it as the half comes to a close. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by half seconds remaining
+ggplot(fourthdown, aes(half_seconds_remaining)) + 
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```
+
+
+### Game Seconds Remaining
+Out of the three time related graphs, this is the one with the most apparent relationship as the "Go For It" rates significantly spike towards the end of the game, as teams in a close one will typically be bolder when they are trying to comeback or pull ahead. One thing to notice about these graphs is the spikes at the end of the quarter or the 2:00 minute warning. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by game seconds remaining
+ggplot(fourthdown, aes(game_seconds_remaining)) + 
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```
+In all of the above graphs, we can see that as time goes on, and the seconds remaining decreases, then the frequency of teams going for it increases
+
+
+### Score Differential
+The score differential appears to follow some sort of Gaussian distribution, with the average score differential around 0 for 4th down plays. Even though the amount of plays is pretty evenly distributed when the score differential is below and above the average, there is significantly more orange when the score differential is a negative value. This means that when teams are losing, they are more likely to go for it in an effort to pull out all of their efforts to win the game. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by score differential
+ggplot(fourthdown, aes(score_differential)) +
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+``` 
+
+
+### Week
+Looking at the graph below, there is little relation between the week of the game and whether a team is going for it more often. This makes sense, as a team is going to try and win every game they play in no matter the week, but they do get a little more aggressive towards the end of the year when they either have nothing to lose or everything to gain as the season starts to come to a close. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by week of the season
+ggplot(fourthdown, aes(week)) +
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```   
+
+
+### Season Type
+From the graph, it appears that the proportion of going for it on 4th down remains consistent across the regular season and playoffs. This surprises me a little bit, as I feel teams would be more conservative in the playoffs. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by regular season or postseason
+ggplot(fourthdown, aes(season_type)) +
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```   
+
+
+### Yards to Go
+One of the most significant influences on a team's 4th down decision is how far they have to go to convert. It is much easier for a team to get 1 yard than it is for them to get 20 yards, so the lower the yards to go is, the more likely a team is to go for it.  \hfill \break 
+Note: The spike at 10 yards to go is for when teams need to do something with their drive to stay in the game, but can not get anything done on the first 3 downs, so they must go for it on 4th and 10. \hfill \break
+```{r}
+# Barplot of difference in go_for_it by yards to go on down
+ggplot(fourthdown, aes(ydstogo)) +
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```  
+
+
+### Importance of Home
+Contrary to my initial belief, home field advantage does not have too significant of an effect on a team's 4th down decision, as the rates do not differ much at all between home and away.    \hfill \break
+```{r}
+# Barplot of difference in go_for_it by home team or away team 
+ggplot(fourthdown, aes(home)) +
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```  
+
+
+### Temperature
+I thought that more teams would go for it when the weather is really cold because the conditions make it difficult for teams to kick or punt in when it is snowing or raining. However, the weather appears to have very little effect on the 4th down decision for teams.  \hfill \break
+```{r}
+# Barplot of difference in go_for_it by temperature on field
+ggplot(fourthdown, aes(temp)) +
+  geom_bar(aes(fill = go_for_it)) +
+  scale_fill_manual(values = c("#000000", "#FB4F14"))
+```  
+
+
+
+# Setting Up Models
+
+It's finally time to start setting up our models! We have a general idea of how most variables impact the decision on teams going for it, so we can perform our train / test split, create our recipe, and establish cross validation to help with our models. 
+
+## Train/Test Split
+Before we do any model building, we have to perform a training / testing split on our data. I decided to go with 80/20 for this data because the testing data set will still have a significant amount of observations, but our model has more to train on and learn. The reason we do this is because we want to avoid over-fitting, so the testing set is reserved as this untouchable golden data set that can only be fit once to deem how accurate our model truly is. We also set a random seed to ensure the training / testing split is the same set every time we go back and work on the following code. We stratify on our response variable, `go_for_it`, and we can move the chains right along (no pun intended, again)! 
+```{r class.source = "fold-show"}
+set.seed(912)  # setting a seed so the split is the same
+fourthdown_split <- fourthdown %>%
+  initial_split(prop = 0.8, strata = "go_for_it")
+
+fourthdown_train <- training(fourthdown_split) # training split
+fourthdown_test <- testing(fourthdown_split) # testing split
+```
+\hfill \break
+```{r class.source = "fold-show"}
+dim(fourthdown_train)
+dim(fourthdown_test)
+```
+
+There are now 24012 observations in the training dataset, and 6004 observations in the testing dataset, both adequate values for efficient model building. 
+
+## Recipe Building
+
+Because we are going to be use the same predictors, model conditions, and response variable, we create one central *recipe* for all of our models to work with. Because we are working with NFL data, think of the recipe like a playbook. Every NFL team has their own unique playbook that remains similar from week to week but is used in a different way. The recipe is the playbook and the different games are the different models. Each model takes in a unique recipe but works with it under different circumstances, just like each NFL team takes their unique playbook and applies it differently to their specific game. \hfill \break
+We only used 14 of the 20 predictor variables, excluding `posteam`, `defteam`, `home_timeouts_remaining`, `away_timeouts_remaining`, and `posteam_score` and `defteam-score` for a couple of reasons. The actual team that is making the decision has no effect on the model's ability, just like the amount of timeouts a team has, and the `score_differential` variable accomplishes the model incorporating the score of the game into its predictions. \hfill \break 
+we will make `season_type`, `goal_to_go`, `home`, and `season` into dummy variables because they are categorical, and center and scale our data for model usage. \hfill \break 
+```{r class.source = "fold-show"}
+fourthdown_recipe <-   # building the recipe to be used for each model
+  recipe(go_for_it ~ season_type + season + week + yardline_100 + goal_to_go +
+           quarter_seconds_remaining + half_seconds_remaining + 
+           game_seconds_remaining + qtr + ydstogo +
+           score_differential + wind + temp + home, 
+         data = fourthdown_train) %>% 
+  step_dummy(season_type) %>%  # dummy predictor on categorical variables
+  step_dummy(goal_to_go) %>%
+  step_dummy(home) %>% 
+  step_dummy(season) %>%
+  step_center(all_predictors()) %>%   # standardizing our predictors
+  step_scale(all_predictors())
+```
+
+
+## K-Fold Cross Validation
+
+We are going to use stratified cross validation to help with the issue of imbalanced data, and we are of course going to stratify on our response variable, `go_for_it`. 
+```{r class.source = "fold-show"}
+fourthdown_folds <- vfold_cv(fourthdown_train, v = 10, strata = go_for_it)  # 10-fold CV
+```
+
+
+Because building models take so much computng time, I decided to save the results to an RDA file once I had the model I wanted so I could go back and load it later with no time commitment. 
+```{r class.source = "fold-show"}
+save(fourthdown_folds, fourthdown_recipe, fourthdown_train, fourthdown_test, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Modeling-Setup.rda")
+```
+
+# Model Building 
+
+
+Time for the most important part of the project: building our models. As previously stated in the introduction, we will be trying out seven different machine learning techniques all using the same recipe. This took quite a while because some of the models took multiple hours to run while they were tuning. Because the model building process is similar for all seven different ones, I only pre-show the random forest one as that was our most successful (spoiler alert!), but feel free to show the code chunk for any of them! You can see the layout for every model being built this way. I decided to set my metric of performance as **roc_auc**, because that is what shows the most significant level of efficiency in a binary classification model where the data is not perfectly balanced. This essentially calculates the area under the curve for the receiver operating characteristic (ROC) curve, which highlights the trade-off between sensibility and sensitivity. In the end, I think it was a great success! \hfill \break
+Nearly every model built had the same process, which I will detail right now.
+* 1. Set up the model by specifying what type of model, setting its engine, and setting its mode (which was always classification) 
+
+* 2. Set up the workflow, add the new model, and add the established recipe. 
+
+Skip steps 3-5 for Logistic Regression, LDA, and QDA. \hfill \break
+
+* 3. Set up the tuning grid with the parameters that we want tuned, and how many different levels of tuning
+
+* 4. Tune the model with certain parameters of choice
+
+* 5. Select the most accurate model from all of the tuning, finalize the workflow with those tuning parameters
+
+* 6. Fit that model with our workflow to the training data set
+
+* 7. Save our results to an RDA file so we do not have to spend time running it over and over again
+
+
+## Logistic Regression 
+```{r}
+fourthdown_log_reg_mod <- logistic_reg() %>%  
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+fourthdown_log_reg_workflow <- workflow() %>% 
+  add_model(fourthdown_log_reg_mod) %>% 
+  add_recipe(fourthdown_recipe)
+
+fourthdown_log_reg_fit <- fit(fourthdown_log_reg_workflow, fourthdown_train)
+
+
+save(fourthdown_log_reg_fit, fourthdown_log_reg_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Logistic-Regression.rda")
+```
+
+
+
+## Linear Discriminant Analysis
+
+```{r}
+fourthdown_lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+fourthdown_lda_workflow <- workflow() %>% 
+  add_model(fourthdown_lda_mod) %>% 
+  add_recipe(fourthdown_recipe)
+
+fourthdown_lda_fit <- fit(fourthdown_lda_workflow, data = fourthdown_train)
+
+
+save(fourthdown_lda_fit, fourthdown_lda_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Linear-Discriminant-Analysis.rda")
+```
+
+
+## Quadratic Discriminat Analysis
+
+```{r}
+fourthdown_qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+fourthdown_qda_workflow <- workflow() %>% 
+  add_model(fourthdown_qda_mod) %>% 
+  add_recipe(fourthdown_recipe)
+
+fourthdown_qda_fit <- fit(fourthdown_qda_workflow, data = fourthdown_train)
+
+
+save(fourthdown_qda_fit, fourthdown_qda_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Quadratic-Discriminant-Analysis.rda")
+```
+
+
+
+
+## Lasso 
+
+```{r, eval = FALSE}
+fourthdown_lasso_mod <- 
+  logistic_reg(penalty = tune(), mixture = 1) %>%  # we tune the penalty parameter
+  set_mode("classification") %>% 
+  set_engine("glmnet") 
+
+fourthdown_lasso_wf <- workflow() %>% 
+  add_recipe(fourthdown_recipe) %>% 
+  add_model(fourthdown_lasso_mod)
+
+fourthdown_lasso_grid <- grid_regular(penalty(range = c(-5, 5)), levels = 10)
+
+fourthdown_lasso_tune <- tune_grid(
+  fourthdown_lasso_wf,
+  resamples = fourthdown_folds, 
+  grid = fourthdown_lasso_grid
+)
+
+fourthdown_lasso_best <- select_best(fourthdown_lasso_tune, metric = "accuracy")
+
+fourthdown_lasso_final <- finalize_workflow(fourthdown_lasso_wf, fourthdown_lasso_best)
+
+fourthdown_lasso_fit <- fit(fourthdown_lasso_final, data = fourthdown_train)
+
+save(fourthdown_lasso_fit, fourthdown_lasso_final, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Lasso.rda")
+```
+
+
+
+
+
+## Decision Tree
+
+```{r, eval = FALSE}
+fourthdown_dt_mod <- 
+  decision_tree(cost_complexity = tune(),
+                tree_depth = tune(),
+                min_n = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+fourthdown_dt_wf <- workflow() %>%
+  add_model(fourthdown_dt_mod) %>%
+  add_recipe(fourthdown_recipe)
+
+fourthdown_dt_params <- parameters(fourthdown_dt_mod)
+
+
+fourthdown_dt_grid <- grid_regular(fourthdown_dt_params, levels = 3)
+
+fourthdown_dt_tune <- tune_grid(
+  fourthdown_dt_wf, 
+  resamples = fourthdown_folds, 
+  grid = fourthdown_dt_grid, 
+  metrics = metric_set(roc_auc)
+)
+
+fourthdown_dt_best <- select_best(fourthdown_dt_tune)
+
+fourthdown_dt_final <- finalize_workflow(fourthdown_dt_wf, fourthdown_dt_best)
+
+fourthdown_dt_fit <- fit(fourthdown_dt_final, data = fourthdown_train)
+
+
+save(fourthdown_dt_fit,
+     fourthdown_dt_final, 
+     fourthdown_dt_tune,
+     file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Decision-Tree.rda")
+```
+
+
+
+## Random Forest
+
+```{r class.source = "fold-show", eval = FALSE}
+fourthdown_rf_model <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>%
+  set_engine("randomForest", importance = TRUE) %>%
+  set_mode("classification")
+
+fourthdown_rf_wf <- workflow() %>%
+  add_model(fourthdown_rf_model) %>%
+  add_recipe(fourthdown_recipe)
+
+fourthdown_rf_grid <- grid_regular(mtry(range = c(1,8)),
+                                trees(range = c(1,10)),
+                                min_n(range = c(1,50)),
+                                levels = 5)
+
+fourthdown_rf_tune <- tune_grid(
+  fourthdown_rf_wf,
+  resamples = fourthdown_folds,
+  grid = fourthdown_rf_grid,
+  metrics = metric_set(roc_auc)
+)
+
+fourthdown_rf_best <- select_best(fourthdown_rf_tune)
+
+fourthdown_rf_final <- finalize_workflow(fourthdown_rf_wf, fourthdown_rf_best)
+
+fourthdown_rf_fit <- fit(fourthdown_rf_final, data = fourthdown_train)
+
+
+save(fourthdown_rf_fit, 
+     fourthdown_rf_final,
+     fourthdown_rf_tune,
+     file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Random-Forest.rda")
+```
+
+
+## K-Nearest Neighbor
+
+  
+```{r, eval = FALSE}
+fourthdown_knn_mod <- nearest_neighbor(neighbors = tune(),
+                                       mode = "classification") %>%
+  set_engine("kknn")
+
+fourthdown_knn_wf <- workflow() %>% 
+  add_model(fourthdown_knn_mod) %>% 
+  add_recipe(fourthdown_recipe)
+
+fourthdown_knn_grid <- grid_regular(neighbors(range = c(1,20)), levels = 10)
+
+fourthdown_knn_tune <- tune_grid(
+  fourthdown_knn_wf,
+  resamples = fourthdown_folds,
+  grid = fourthdown_knn_grid,
+  metrics = metric_set(roc_auc)
+)
+
+fourthdown_knn_best <- select_best(fourthdown_knn_tune)
+
+fourthdown_knn_final <- finalize_workflow(fourthdown_knn_wf, fourthdown_knn_best)
+
+fourthdown_knn_fit <- fit(fourthdown_knn_final, data = fourthdown_train)
+
+save(fourthdown_knn_fit, 
+     fourthdown_knn_final,
+     fourthdown_knn_tune,
+     file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-K-Nearest-Neighbor.rda")
+```
+
+
+# Results of our Models
+
+In total, model building probably took about a week in terms of choosing the ones that work the best, finding the right tuning parameters and levels, and actual execution with MacBook-level computing power. Nevertheless, we made it to the other side of the line (no pun intended), and have all of our outcomes stored for our models. Without further ado, let's load the saved results we have, and begin analyzing their performances! \hfill \break 
+```{r}
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Modeling-Setup.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Logistic-Regression.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Linear-Discriminant-Analysis.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Quadratic-Discriminant-Analysis.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Lasso.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Decision-Tree.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Random-Forest.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-K-Nearest-Neighbor.rda")
+```
+
+
+
+## Model Autoplots
+
+One of the most useful tools for visualizing the results of models that have been tuned is the *autoplot* function in r. This will visualize the effects that the change in certain parameters has on our metric of choice, **roc_auc**. 
+
+### Decision Tree Plot
+
+For the decision tree, we had three different levels of tree depth, penalty, and minimal node size. We can see from the graph that the optimal tree depth was around 8, higher minimal node sizes resulted in slightly better performing models when it came to ROC AUC, and larger penalties caused the accuracy of the decision tree to drop. 
+```{r class.source = "fold-show"}
+autoplot(fourthdown_dt_tune)
+```
+
+
+### Random Forest Plot 
+In our random forest, we tuned three different parameters: **mtry** - The number of predictors that would be randomly sampled and given to the tree to make its decisions, **trees** - The number of trees to grow in the forest, and **min_n** - the minimum number of data values needed to create another split. As the number of predictors increase, so did the accuracy. As the number of trees increased, the ROC AUC also typically increased. The optimal minimal node size was somewhere around 25. It looks like the top middle plot featured our most accurate model, with about 10 trees, 6 randomly selected predictors, and a minimal node size around 13. This definitely appears to be the most effective model thus far. \hfill \break
+```{r class.source = "fold-show"}
+autoplot(fourthdown_rf_tune)
+```
+
+
+### K-Nearest Neighbor Plot 
+The greater the amount of nearest neighbors, the more accurate our model was when it came to K-Nearest Neighbors. The highest ROC AUC was a little below 0.85, which is already not as effective as a lot of our random forest models. 
+```{r class.source = "fold-show" }
+autoplot(fourthdown_knn_tune)
+```
+
+
+## Accuracy of Our Models
+
+
+To compare the seven best ROC AUC scores for each model, I created a tibble that gives the estimate for the optimal model's RAS a for each technique. From here on out, I will be calling ROC AUC Scores "RAS" in acronoym. 
+```{r}
+fourthdown_log_reg_auc <- augment(fourthdown_log_reg_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_lda_auc <- augment(fourthdown_lda_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_qda_auc <- augment(fourthdown_qda_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_lasso_auc <- augment(fourthdown_lasso_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_dt_auc <- augment(fourthdown_dt_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_rf_auc <- augment(fourthdown_rf_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_knn_auc <- augment(fourthdown_knn_fit, new_data = fourthdown_train) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+
+fourthdown_roc_aucs <- c(fourthdown_log_reg_auc$.estimate,
+                           fourthdown_lda_auc$.estimate,
+                           fourthdown_qda_auc$.estimate,
+                           fourthdown_lasso_auc$.estimate,
+                           fourthdown_dt_auc$.estimate,
+                           fourthdown_rf_auc$.estimate,
+                           fourthdown_knn_auc$.estimate)
+
+fourthdown_mod_names <- c("Logistic Regression",
+            "LDA",
+            "QDA",
+            "Lasso",
+            "Decision Tree",
+            "Random Forest",
+            "K-Nearest Neighbor")
+```
+
+```{r class.source = "fold-show"}
+fourthdown_results <- tibble(Model = fourthdown_mod_names,
+                             ROC_AUC = fourthdown_roc_aucs)
+
+fourthdown_results <- fourthdown_results %>% 
+  arrange(-fourthdown_roc_aucs)
+
+fourthdown_results
+```
+
+I also created a bar plot, lollipop plot, and dot plot to help visualize these results, which you can see below. 
+```{r}
+fourthdown_bar_plot <- ggplot(fourthdown_results, 
+       aes(x = Model, y = ROC_AUC)) + 
+  geom_bar(stat = "identity", width=0.2, fill = "#FB4F14", color = "black") + 
+  labs(title = "Performance of Our Models") + 
+  theme_minimal()
+
+fourthdown_lollipop_plot <- ggplot(fourthdown_results, aes(x = Model, y = ROC_AUC)) + 
+    geom_segment( aes(x = Model, xend = 0, y = ROC_AUC, yend = 0)) +
+  geom_point( size=7, color= "black", fill=alpha("#FB4F14", 0.3), alpha=0.7, shape=21, stroke=3)+
+  labs(title = "Performance of Our Models") + 
+  theme_minimal()
+
+fourthdown_dot_plot <- ggplot(fourthdown_results, aes(x = Model, y = ROC_AUC)) +
+  geom_point(fill = "#FB4F14", col = "#FB4F14", size=10) + 
+  geom_segment(aes(x = Model, 
+                   xend = Model, 
+                   y=min(ROC_AUC), 
+                   yend = max(ROC_AUC)), 
+               linetype = "dashed", 
+               size=0.5) + 
+  labs(title = "Performance of Our Models") + 
+  theme_minimal() +
+  coord_flip()
+```
+  
+```{r class.source = "fold-show"}
+fourthdown_bar_plot
+fourthdown_lollipop_plot
+fourthdown_dot_plot
+```
+In all three of the graphs, it is evident that the best random forest model we built is going to be the model that we use going forward to fit to our testing data, and analyze its true performance on. All of our models performed fairly well, having an RAS of over 0.83 across the board, but the more involved models like random forests and decisions trees consistently performed better. 
+
+
+# Results From the Best Model
+
+We will work with one of the random forest models because that was the best performer. To get an idea of how exactly a random forest works, take a look at the diagram below. As you can see, this definitely takes a while for the model to figure out, so I am curious which random forest outperformed the rest! We have already selected the best of our models, so there is no need to finalize the workflows or anything like that. Now, all there is to do is analyze the best random forest as our champion model, and then fit it to our testing data to analyze its true performance. 
+
+<center>
+
+![](/Users/lukefields/Desktop/Fourthdown-Project/Images/rf_diafgram.gif)
+
+</center>
+
+## Congratulations Random Forest 49!
+
+It seems that model #25 of the 100s of random forest models is the best out of all seven different techniques we implemented across the board. We can see the specific parameters of lucky number 25 below. 
+```{r class.source = "fold-show"}
+show_best(fourthdown_rf_tune, metric = "roc_auc") %>% #showing the best rf model
+  select(-.estimator, .config) %>%
+  slice(1)
+```
+
+
+
+
+Let's now make predictions on every single observation in the testing set, so we can see what exactly our model predicts for each play in the testing data. 
+```{r class.source = "fold-show"}
+fourthdown_predict <- predict(fourthdown_rf_fit,  # fitting our model to testing data
+                              new_data = fourthdown_test, 
+                              type = "class")
+
+fourthdown_predict_with_actual <- fourthdown_predict %>%
+  bind_cols(fourthdown_test)  # adding the actual values side by side to our predicted values
+
+fourthdown_predict_with_actual
+```
+```{r}
+fourthdown_augmented <- augment(fourthdown_rf_fit, new_data = fourthdown_test) # used for ROC 
+fourthdown_augmented
+```
+
+
+
+
+## ROC Curve
+
+  
+Let's take a look at the ROC curve real quick before we view the final results of model 425's RAS! The graph looks great, as we want the curve to follow a trajectory that is as up and to the left as possible. One way to think about it is the more our curve looks like a capital gamma, the greek letter $\Gamma$, the better. 
+```{r}
+fourthdown_roc_curve <- augment(fourthdown_rf_fit, new_data = fourthdown_test) %>%
+  roc_curve(go_for_it, estimate = .pred_0)  # computing the ROC curve for this model
+
+autoplot(fourthdown_roc_curve)
+```
+
+## Final ROC AUC Results
+
+Time for the big reveal...what is our ROC's AUC for model 25?
+```{r class.source = "fold-show"}
+fourthdown_roc_auc <- augment(fourthdown_rf_fit, new_data = fourthdown_test) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)  # computing the AUC for the ROC curve
+
+fourthdown_roc_auc
+```
+In the world of statistics, any RAS over 0.9 is consider to be excellent in terms of measuring the model's performance, so having an ROC AUC of 0.9078 for our best performing model calls for...excitement! Hey Joe, grab a cigar to help me celebrate!
+
+<center>
+
+![](/Users/lukefields/Desktop/Fourthdown-Project/Images/tenor.gif)
+
+</center>
+
+  
+
+# Visualizing Model Performance
+
+Our model had pretty phenomenal results when it comes to its performance metric, but let's dig a little deeper into what our model is going to look like for actual NFL teams. I will now introduce `nflplotr`, a package under the same `nflverse`, which allows us to visualize key statistics and figures for NFL teams in a really cool way; incorporating team logos, colors, and word-marks. We will use this package to show how each team performs in relation to the model, by building functions and graphs that allow us to analyze organizations individually. 
+
+```{r}
+library(nflplotR)
+```
+
+
+## Model Accuracy by Team 
+
+Before we can do any visualizing, we have to obtain the data *by team*, which was not an easy task. I ended up building a function that ierates through each of the team names and appends the unique ROC AUC scores for each team to a vector. Then, I joined the team names and these accuracy ratings into a data frame using a loop to get the exact data I was looking for.
+
+
+```{r class.source = "fold-show"}
+team_names <- c("ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN",
+                "CLE", "DAL", "DEN", "DET", "GB", "HOU", "IND",
+                "JAX", "KC", "LA", "LAC", "LV", "MIA", "MIN", "NE", "NO",
+                "NYG", "NYJ", "PHI", "PIT", "SF", "SEA", "TEN", "TB", "WAS")
+
+
+team_roc_auc <- function(team){
+  estimate_column <- (fourthdown_augmented %>%
+                        filter(str_detect(posteam, team)) %>%
+                        roc_auc(go_for_it, estimate = .pred_0) %>%
+                        select(.estimate))
+  estimate <- estimate_column$.estimate
+  (estimate)
+  }
+
+
+team_roc_auc_scores <- vector("integer", 0)
+
+for(i in team_names){
+  team_roc_auc_scores <- c(team_roc_auc_scores, team_roc_auc(i))}
+
+fourthdown_roc_auc_by_team <- tibble(Team = team_names, ROC_AUC = team_roc_auc_scores)
+
+fourthdown_roc_auc_by_team
+```
+
+
+I was a little skeptical about if my code was working properly, so I decided just to do a quick double check with an ordinary NFL team's ROC AUC score. Can you guess what team I chose? 
+
+<center>
+
+![](/Users/lukefields/Desktop/Fourthdown-Project/Images/money-mix.gif)
+
+</center>
+
+  
+```{r  class.source = "fold-show"}
+fourthdown_bengals_roc_auc <- fourthdown_augmented %>%
+  filter(str_detect(posteam, "CIN")) %>%
+  roc_auc(go_for_it, estimate = .pred_0) %>%
+  select(.estimate)
+  
+fourthdown_bengals_roc_auc
+```
+Checks out!
+
+
+
+Now, we can finally implement the new package we've been waiting to use, by plotting the ROC AUC score by team to get an idea of how well our model works for each individual organization. It seems that the model works really well on the Indianapolis Colts, and does not do its best on the Detroit Lions. The model never dipped below a ROC AUC performance of 0.75 for any of the teams, which is good news. 
+```{r}
+fourthdown_roc_auc_by_team_bar <- ggplot(fourthdown_roc_auc_by_team, aes(x = Team, y = ROC_AUC)) +
+  geom_col(aes(color = Team, fill = Team), width = 0.4) +
+  scale_color_nfl(type = "secondary") +
+  scale_fill_nfl(alpha = 0.5) +
+  labs(
+    title = "Model ROC AUC By Team",
+    y = "ROC AUC of Our 4th Down Model"
+  ) + theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.title.position = "plot",
+    axis.title.x = element_blank(),
+    axis.text.x = element_nfl_logo(size = 1)
+  )
+
+fourthdown_roc_auc_by_team_bar
+```
+
+
+## Further Investigation of Teams
+
+Why does the model work better for some teams and not as strongly for others? After all, if this model was going to be effective, each NFL team would want it to work the best for them. For that reason, this question is one I wanted to answer, and I thought it had to do with how often these teams actually go for it in real life, or how much 4th down data we have available on these teams. I had to calculate the total plays in our testing data set, as well as the "Go For It" proportion in actuality. 
+```{r, warning = FALSE}
+fourthdown_go_for_it_total <- fourthdown_test %>%
+    group_by(posteam) %>%
+    summarize(n = n()) 
+
+names(fourthdown_go_for_it_total)[2] <- "Total"
+
+fourthdown_go_for_it_amt <- fourthdown %>%
+    group_by(posteam, go_for_it) %>%
+    summarize(n = n()) 
+
+didnt_go_for_it <- fourthdown_go_for_it_amt %>%
+  filter(str_detect(go_for_it, "0"))
+
+went_for_it <- fourthdown_go_for_it_amt %>%
+  filter(str_detect(go_for_it, "1"))
+
+didnt_go_for_it <- didnt_go_for_it %>%
+  cbind(went_for_it$n) 
+
+didnt_go_for_it <- didnt_go_for_it %>%
+  mutate(proportion = ((...4)) / n)
+
+fourthdown_roc_auc_team_prop <- fourthdown_roc_auc_by_team %>%
+  cbind(didnt_go_for_it$proportion) %>%
+  cbind(fourthdown_go_for_it_total$Total)
+
+names(fourthdown_roc_auc_team_prop)[3] <- "Rate"
+names(fourthdown_roc_auc_team_prop)[4] <- "Total"
+```
+
+
+## Comparison Between How Often Teams Go For it and Our Model's ROC AUC
+Plotted below is the relationship between the actual rates that teams go for it in real life and how well our model worked for them, and the results are interesting. The best performing model had one of the highest go for it rates, but the lowest performing models had above average go for it rates. In general, the bolder a team was on 4th down, then our model had more distinguishable characteristics of when that team would go for it, and was able to perform better, but the correlation for this relationship was still quite weak. 
+```{r}
+fourthdown_rate_roc_auc_scatter <- ggplot(fourthdown_roc_auc_team_prop, aes(x = Rate, y = ROC_AUC)) +
+  geom_mean_lines(aes(v_var = Rate , h_var = ROC_AUC)) +
+  geom_nfl_logos(aes(team_abbr = Team), width = 0.065, alpha = 0.83) +
+  labs(
+    x = "Go For it Rate",
+    y = "Team ROC AUC",
+    title = "Comparison Between How Often Teams Go For it and Our Model's ROC AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.title.position = "plot"
+  )
+
+fourthdown_rate_roc_auc_scatter
+```
+
+
+## Comparison Between How Many 4th Down Plays and Our Model's ROC AUC
+Plotted below is the relationship between the amount of 4th down data we have on a team and how well our model worked for them, and the results were again quite fascinating. The best performing model (Colts) had some of the smallest amount of data on it, just like the lowest performing models (Lions and Saints). In general, the more data that we have on a team meant our model was able to perform better, as evident by the cluster on the top right corner of the graph of teams that our model executed well on and that we had more data on. 
+```{r}
+fourthdown_total_roc_auc_scatter <- ggplot(fourthdown_roc_auc_team_prop, aes(x = Total, y = ROC_AUC)) +
+  geom_mean_lines(aes(v_var = Rate , h_var = ROC_AUC)) +
+  geom_nfl_logos(aes(team_abbr = Team), width = 0.065, alpha = 0.83) +
+  labs(
+    x = "Amount of 4th Down Plays",
+    y = "Team ROC AUC",
+    title = "Comparison Between How Much Data and Our Model's ROC AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.title.position = "plot"
+  )
+
+fourthdown_total_roc_auc_scatter
+```
+
+
+## Model Accuracy By Year
+Because 4th down rates are increasing every year, I wanted to see how well our model worked on a season-by-season basis. Teams in 2011 were a lot less likely to go for it on 4th down than they are in their bold 2020 ways. So, I performed similar manipulation as I did to iterate through all of the NFL teams for each season between 2011-2020. 
+
+```{r class.source = "fold-show"}
+years <- c("2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020")
+
+
+year_roc_auc <- function(year){
+  estimate_column <- (fourthdown_augmented %>%
+                        filter(str_detect(season, year)) %>%
+                        roc_auc(go_for_it, estimate = .pred_0) %>%
+                        select(.estimate))
+  estimate <- estimate_column$.estimate
+  (estimate)
+  }
+
+
+year_roc_auc_scores <- vector("integer", 0)
+
+for(i in years){
+  year_roc_auc_scores <- c(year_roc_auc_scores, year_roc_auc(i))}
+
+fourthdown_roc_auc_by_year <- tibble(Year = years, ROC_AUC = year_roc_auc_scores)
+```
+Like I expected, our model performed best in one of the more recent years, 2018. But, the performance tanked a little bit in 2019 and 2020 after steadily improving in previous years because of the new boom in the analytics, and still some unpredictability regarding some coaches' decisions. This is where some of the weaknesses of our model shows a little bit. 
+```{r}
+fourthdown_roc_auc_by_year$Year <- sapply(fourthdown_roc_auc_by_year$Year, as.numeric)
+
+fourthdown_roc_auc_year_hist <- ggplot(fourthdown_roc_auc_by_year, aes(x = Year, y= ROC_AUC)) +
+  geom_line() + 
+  geom_point(fill = "#FB4F14", col = "#FB4F14", size=10) + 
+  labs(title = "ROC AUC Of Our Model Over Time") + 
+  theme_minimal()
+
+fourthdown_roc_auc_year_hist
+```
+
+
+## Variable Importance Chart
+How close a team is to scoring, how much further they have to convert, how many points they are ahead/behind by, and how much time left in the game are all, unsurprisingly, the most variables in determining whether or not a team will go for it on 4th down according to this variable importance chart. 
+```{r}
+fourthdown_rf_fit %>%
+  extract_fit_engine() %>%
+  vip(aesthetics = list(fill = "#FB4F14", color = "black")) 
+```
+
+
+
+
+
+
+## Example: Bengals' Accuracy By Year
+
+The trends of the season-by-season graph follow suit within the individual teams as well, as highlighted by this graph of the Bengals. 
+```{r}
+ggplot(fourthdown_roc_auc_by_year, aes(x = Year, y = ROC_AUC)) +
+  geom_area() +
+  facet_wrap(vars(posteam = "CIN")) +
+  labs(
+    title = "Cincinnati Bengals' Model ROC AUC By Year",
+    x = "Year", y = "ROC AUC of Model"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold"),
+    axis.title = element_blank(),
+    strip.text = element_nfl_wordmark(size = 5),
+    plot.caption = element_path(hjust = 1, size = 0.4))
+```
+
+
+# Putting Our Model To Use
+
+How useful can this model really be? Some of the most controversial and exciting moments in NFL history have come with 4th down decisions, and it is fascinating to see how our model could perform with some of the most memorable choices in recent history. 
+
+## Bengals' New Years Eve 2017 Shockwave
+When the Cincinnati Bengals faced a 4th & 12 trailing the Baltimore Ravens 24-27 in the last week of the season and last day of the year in 2017, they were already eliminated from playoff contention. But, that does not mean they were putting up every last fight against their heated division rival. Not only was their team's passion on the line, but if the Bengals were able to keep the drive going and pull ahead of the Ravens, then the Buffalo Bills would make the playoffs for the first time in over a decade. The country was watching what would happen next, and our model knew they would go for it due to these circumstances. 
+```{r}
+fourthdown_ex1 <- data.frame(
+  posteam = "CIN",
+  defteam = "BAL",
+  season = "2017",
+  season_type = "REG",
+  week = 17,
+  yardline_100 = 49,
+  quarter_seconds_remaining = 53,
+  half_seconds_remaining = 53,
+  game_seconds_remaining = 53,
+  qtr = 4,
+  goal_to_go = "0",
+  ydstogo = 12,
+  home_timeouts_remaining = 3,
+  away_timeouts_remaining = 0,
+  posteam_score = 24,
+  defteam_score = 27,
+  score_differential = -3,
+  wind = 12,
+  temp = 19,
+  home = "0"
+)
+```
+
+``` {r class.source = "fold-show"}
+predict(fourthdown_rf_fit, fourthdown_ex1, type = "class")
+```
+
+So, what actually happened? Only one of the most remarkable 4th down sequences in NFL history that saw a 49 (we just love that number) yard strike from Andy Dalton to Tyler Boyd to crush Ravens fans' dreams and seal the day as one of the happiest in Buffalo history.  \hfill \break
+
+<center>
+
+<video width="600" height="340" controls>
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Bengals_4th_and_12.mp4" type="video/mp4">
+</video>
+
+</center> \hfill \break
+
+
+## Ravens 4th and 29 Miracle in 2012
+In an obvious "Go For It" despiration decision, we are testing our model's ability to predict the easy ones. The Baltimore Ravens were trailing the then-San Diego Chargers in a crucial late season match in their eventual Super Bowl Champion 2012 year, but it was this play that changed the course of the entire season.  Our model correctly thinks the Ravens should pray for a miraculous play, and do whatever they can to cross that 29 yard line mark.
+```{r}
+fourthdown_ex2 <- data.frame(
+  posteam = "BAL",
+  defteam = "LAC",
+  season = "2012",
+  season_type = "REG",
+  week = 12,
+  yardline_100 = 63,
+  quarter_seconds_remaining = 119,
+  half_seconds_remaining = 119,
+  game_seconds_remaining = 119,
+  qtr = 4,
+  goal_to_go = "0",
+  ydstogo = 29,
+  home_timeouts_remaining = 3,
+  away_timeouts_remaining = 2,
+  posteam_score = 10,
+  defteam_score = 13,
+  score_differential = -3,
+  wind = 1,
+  temp = 59,
+  home = "0"
+)
+```
+
+```{r class.source = "fold-show"}
+predict(fourthdown_rf_fit, fourthdown_ex2, type = "class")
+```
+
+So, what actually happened? The Ravens running back and blockers worked their magic to pull off one of the most unlikely plays in NFL history.  \hfill \break
+
+
+<center>
+
+<video width="600" height="340" controls>
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Ravens_4th_and_29.mp4" type="video/mp4">
+</video>
+
+</center> \hfill \break
+
+
+## Packers Blunder in the 2021 NFC Championship Game
+In the final minutes of the game that decided who would represent the NFC in Super Bowl LV, the Green Bay Packers were behind against the Tampa Bay Buccaneers by one possession with only 8 yards to go in the endzone. Everyone and their mother believed the right call was to try and score a touchdown with the golden opportunity. Our model thought the same. 
+```{r}
+fourthdown_ex3 <- data.frame(
+  posteam = "GB",
+  defteam = "TB",
+  season = "2020",
+  season_type = "POST",
+  week = 20,
+  yardline_100 = 8,
+  quarter_seconds_remaining = 129,
+  half_seconds_remaining = 129,
+  game_seconds_remaining = 129,
+  qtr = 4,
+  goal_to_go = "1",
+  ydstogo = 8,
+  home_timeouts_remaining = 3,
+  away_timeouts_remaining = 3,
+  posteam_score = 23,
+  defteam_score = 31,
+  score_differential = -8,
+  wind = 10,
+  temp = 29,
+  home = "1"
+)
+```
+
+```{r class.source = "fold-show"}
+predict(fourthdown_rf_fit, fourthdown_ex3, type = "class")
+```
+
+So, what actually happened? The Packers decided to take the points, and they never saw the ball again that season, resulting in a heartbreaking defeat in a controversial fashion. Maybe they should have listened to the model! \hfill \break
+
+<center>
+
+<video width="600" height="340" controls>
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Packers_Blunder.mp4" type="video/mp4">
+</video>
+
+</center> \hfill \break
+
+
+## Seahawks Fake FG in the 2014 NFC Championship Game. 
+The Seahawks could not get one thing bouncing their way in the first 40 minutes of the NFC Championship game for the 2014 season against the Green Bay Packers. They needed to just take whatever points they could get, so they were lined up to kick a field goal down 16-0. Our model expected them to follow through with this decision, and so did most NFL fans. 
+```{r}
+fourthdown_ex4 <- data.frame(
+  posteam = "SEA",
+  defteam = "GB",
+  season = "2014",
+  season_type = "POST",
+  week = 20,
+  yardline_100 = 19,
+  quarter_seconds_remaining = 290,
+  half_seconds_remaining = 1190,
+  game_seconds_remaining = 1190,
+  qtr = 3,
+  goal_to_go = "0",
+  ydstogo = 10,
+  home_timeouts_remaining = 3,
+  away_timeouts_remaining = 3,
+  posteam_score = 0,
+  defteam_score = 16,
+  score_differential = -16,
+  wind = 15,
+  temp = 52,
+  home = "1"
+)
+```
+
+```{r class.source = "fold-show"}
+predict(fourthdown_rf_fit, fourthdown_ex4, type = "class")
+```
+
+So, what actually happened? The Seahawks faked out the packers after the ball was snapped, and punter Jon Ryan lobbed a touchdown to offensive lineman Gary Gilliam in one of the greatest trick plays of all time, and turning the game around to send the Seahawks to Super Bowl XLIX. 
+
+\hfill \break
+
+<center>
+
+<video width="600" height="340" controls>
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Seahawks_Fake_FG.mp4" type="video/mp4">
+</video>
+
+</center> \hfill \break
+
+
+
+
+# Conclusion
+
+Through thorough research, testing, and analysis, the best model to predict whether or not an NFL team is going to "Go For It" on 4th down is a random forest, but it was not perfect. \hfill \break 
+
+As far as potential improvements, finding a way to implement other models like Naive Bayes or Support Vector Machines might give way to even better results than the Random Forest did, but my computing power struggled with implementing more and more models. One thing you may be wondering throughout this project, especially with the strong ROC AUC ratings, is the imbalanced data for binary classification. Because our data set contains around 80% of teams choosing not to go for it, then if our model only correctly predicted teams not going for it and never teams choosing to be bold, it would still have an accuracy of 80%. So, I went back and ran the model building with a 60/40 split in "going for it" observations and "going for it" observations, to which I found our model had pretty much the same results, so I opted to use the one with more observations. That is also why I used stratified cross validation and settled on a metric like ROC AUC that does not become unbiased when the data is imbalanced in this case. We still achieved quite high ROC AUC scores, and correctly predicted the observation that was a lot less likely (teams going for it) majority of the time. Moving forward, I would also like to explore the visualization packages even further, really maximizing its potential to appeal to the audience I have. \hfill \break
+
+
+Overall, this Fourthdown Model project provided a great opportunity for me to build my experience and skills with machine learning techniques, as well as apply my passion as an NFL fan through the [nflverse](https://nflverse.nflverse.com/), in a way that has gotten me pumped about the world of sports analytics. 
+
+<center>
+
+![](/Users/lukefields/Desktop/Fourthdown-Project/Images/joe-burrow-jags.gif)
+
+</center>
