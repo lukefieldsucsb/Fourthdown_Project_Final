@@ -70,7 +70,7 @@ In the [National Football League](https://www.nfl.com/), teams move the ball on 
 <center>
 
 <video width="600" height="340" controls>
-  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/NGS_Decision_Guide.mp4" type="video/mp4">
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/NGS_Decision_Guide.mp4" type="video/mp4">
   
 </video>
 
@@ -92,7 +92,7 @@ Now that we know the background and importance of our model, let's discuss how w
 
 <center>
 
-![](/Users/lukefields/Desktop/Fourthdown-Project/Images/tom-brady-4th-down.gif)
+![](/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/tom-brady-4th-down.gif)
 
 <c/enter>
 
@@ -213,7 +213,7 @@ Because our data set is so large, we can afford to eliminate missing observation
 ## Tidying Our Data 
 Now we have the exact data we will be working with throughout this project. Let's read the CSV file and take a peek! \hfill \break
 ```{r class.source = "fold-show"}
-fourthdown <- read_csv("~/Desktop/Fourthdown-Project/Data/pbp4th.csv")  # reading our data!
+fourthdown <- read_csv("~/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Data/pbp4th.csv")  # reading our data!
 
 fourthdown %>%
   head()
@@ -427,7 +427,7 @@ fourthdown_folds <- vfold_cv(fourthdown_train, v = 10, strata = go_for_it)  # 10
 
 Because building models take so much computng time, I decided to save the results to an RDA file once I had the model I wanted so I could go back and load it later with no time commitment. 
 ```{r class.source = "fold-show"}
-save(fourthdown_folds, fourthdown_recipe, fourthdown_train, fourthdown_test, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Modeling-Setup.rda")
+save(fourthdown_folds, fourthdown_recipe, fourthdown_train, fourthdown_test, file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Modeling-Setup.rda")
 ```
 
 # Model Building 
@@ -465,7 +465,7 @@ fourthdown_log_reg_workflow <- workflow() %>%
 fourthdown_log_reg_fit <- fit(fourthdown_log_reg_workflow, fourthdown_train)
 
 
-save(fourthdown_log_reg_fit, fourthdown_log_reg_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Logistic-Regression.rda")
+save(fourthdown_log_reg_fit, fourthdown_log_reg_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Logistic-Regression.rda")
 ```
 
 
@@ -484,7 +484,7 @@ fourthdown_lda_workflow <- workflow() %>%
 fourthdown_lda_fit <- fit(fourthdown_lda_workflow, data = fourthdown_train)
 
 
-save(fourthdown_lda_fit, fourthdown_lda_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Linear-Discriminant-Analysis.rda")
+save(fourthdown_lda_fit, fourthdown_lda_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Linear-Discriminant-Analysis.rda")
 ```
 
 
@@ -502,7 +502,7 @@ fourthdown_qda_workflow <- workflow() %>%
 fourthdown_qda_fit <- fit(fourthdown_qda_workflow, data = fourthdown_train)
 
 
-save(fourthdown_qda_fit, fourthdown_qda_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Quadratic-Discriminant-Analysis.rda")
+save(fourthdown_qda_fit, fourthdown_qda_workflow, file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Quadratic-Discriminant-Analysis.rda")
 ```
 
 
@@ -534,7 +534,7 @@ fourthdown_lasso_final <- finalize_workflow(fourthdown_lasso_wf, fourthdown_lass
 
 fourthdown_lasso_fit <- fit(fourthdown_lasso_final, data = fourthdown_train)
 
-save(fourthdown_lasso_fit, fourthdown_lasso_final, file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Lasso.rda")
+save(fourthdown_lasso_fit, fourthdown_lasso_final, file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Lasso.rda")
 ```
 
 
@@ -577,7 +577,7 @@ fourthdown_dt_fit <- fit(fourthdown_dt_final, data = fourthdown_train)
 save(fourthdown_dt_fit,
      fourthdown_dt_final, 
      fourthdown_dt_tune,
-     file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Decision-Tree.rda")
+     file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Decision-Tree.rda")
 ```
 
 
@@ -615,7 +615,7 @@ fourthdown_rf_fit <- fit(fourthdown_rf_final, data = fourthdown_train)
 save(fourthdown_rf_fit, 
      fourthdown_rf_final,
      fourthdown_rf_tune,
-     file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Random-Forest.rda")
+     file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Random-Forest.rda")
 ```
 
 
@@ -649,7 +649,7 @@ fourthdown_knn_fit <- fit(fourthdown_knn_final, data = fourthdown_train)
 save(fourthdown_knn_fit, 
      fourthdown_knn_final,
      fourthdown_knn_tune,
-     file = "/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-K-Nearest-Neighbor.rda")
+     file = "/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-K-Nearest-Neighbor.rda")
 ```
 
 
@@ -657,14 +657,14 @@ save(fourthdown_knn_fit,
 
 In total, model building probably took about a week in terms of choosing the ones that work the best, finding the right tuning parameters and levels, and actual execution with MacBook-level computing power. Nevertheless, we made it to the other side of the line (no pun intended), and have all of our outcomes stored for our models. Without further ado, let's load the saved results we have, and begin analyzing their performances! \hfill \break 
 ```{r}
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Modeling-Setup.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Logistic-Regression.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Linear-Discriminant-Analysis.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Quadratic-Discriminant-Analysis.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Lasso.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Decision-Tree.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-Random-Forest.rda")
-load("/Users/lukefields/Desktop/Fourthdown-Project/Prep RDA/Fourthdown-K-Nearest-Neighbor.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Modeling-Setup.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Logistic-Regression.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Linear-Discriminant-Analysis.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Quadratic-Discriminant-Analysis.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Lasso.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Decision-Tree.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-Random-Forest.rda")
+load("/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Prep RDA/Fourthdown-K-Nearest-Neighbor.rda")
 ```
 
 
@@ -796,7 +796,7 @@ We will work with one of the random forest models because that was the best perf
 
 <center>
 
-![](/Users/lukefields/Desktop/Fourthdown-Project/Images/rf_diafgram.gif)
+![](/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/rf_diafgram.gif)
 
 </center>
 
@@ -856,7 +856,7 @@ In the world of statistics, any RAS over 0.9 is consider to be excellent in term
 
 <center>
 
-![](/Users/lukefields/Desktop/Fourthdown-Project/Images/tenor.gif)
+![](/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/tenor.gif)
 
 </center>
 
@@ -908,7 +908,7 @@ I was a little skeptical about if my code was working properly, so I decided jus
 
 <center>
 
-![](/Users/lukefields/Desktop/Fourthdown-Project/Images/money-mix.gif)
+![](/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/money-mix.gif)
 
 </center>
 
@@ -1135,7 +1135,7 @@ So, what actually happened? Only one of the most remarkable 4th down sequences i
 <center>
 
 <video width="600" height="340" controls>
-  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Bengals_4th_and_12.mp4" type="video/mp4">
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/Bengals_4th_and_12.mp4" type="video/mp4">
 </video>
 
 </center> \hfill \break
@@ -1178,7 +1178,7 @@ So, what actually happened? The Ravens running back and blockers worked their ma
 <center>
 
 <video width="600" height="340" controls>
-  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Ravens_4th_and_29.mp4" type="video/mp4">
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/Ravens_4th_and_29.mp4" type="video/mp4">
 </video>
 
 </center> \hfill \break
@@ -1220,7 +1220,7 @@ So, what actually happened? The Packers decided to take the points, and they nev
 <center>
 
 <video width="600" height="340" controls>
-  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Packers_Blunder.mp4" type="video/mp4">
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/Packers_Blunder.mp4" type="video/mp4">
 </video>
 
 </center> \hfill \break
@@ -1264,7 +1264,7 @@ So, what actually happened? The Seahawks faked out the packers after the ball wa
 <center>
 
 <video width="600" height="340" controls>
-  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Images/Seahawks_Fake_FG.mp4" type="video/mp4">
+  <source src="/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/Seahawks_Fake_FG.mp4" type="video/mp4">
 </video>
 
 </center> \hfill \break
@@ -1283,6 +1283,6 @@ Overall, this Fourthdown Model project provided a great opportunity for me to bu
 
 <center>
 
-![](/Users/lukefields/Desktop/Fourthdown-Project/Images/joe-burrow-jags.gif)
+![](/Users/lukefields/Desktop/Fourthdown-Project/Fourthdown_Project_Final/Images/joe-burrow-jags.gif)
 
 </center>
