@@ -1,0 +1,44 @@
+This dataset has 21 variables and 30,016 observation that describes the context and information before nearly every 4th down play in the NFL from 2011-2020
+
+posteam (chr): String abreviation of the team that has the ball on offense (e.g. CIN for Cincinnati Bengals)
+
+defteam (chr): String abreviation of the team that has the ball on defense (e.g. CIN for Cincinnati Bengals)
+
+season (fctr): Year of the season for the play (between 2011 - 2020 seasons)
+
+season_type (fctr): REG for regular season, and POST for playoffs
+
+week (int): Which week of the season the play is happening in (between Week 1 and 21 (Super Bowl) )
+
+yardline_100 (int): Where the play is taking place on the field; yard location (e.g. 73 for own 27 yardline, 1 for opponents 1 yard line)
+
+quarter_seconds_remaining (int): How many seconds left in the quarter before the ball is snapped (e.g. 132 for 2:32 left in the quarter)
+
+half_seconds_remaining (int): How many seconds left in the half before the ball is snapped (e.g. 960 for 1:00 left in the first quarter)
+
+game_seconds_remaining (int): how many seconds left in the game before the ball is snapped (e.g. 1920 for 2:00 left in the second quarter)
+
+
+qtr (int): Which quarter the play is taking place in (e.g. 2 for 2nd quarter)
+
+goal_to_go (fctr): gives a 1 if the team on offense is in a goal to go situation (inside the 10 yard line), or a 0 if they are not
+
+ydstogo (int): How many yards left for the first down (e.g. 3 for 4th and 3)
+
+home_timeouts_remaining (int): How many timeouts the home team has (1, 2, or 3)
+
+away_timeouts_remaining (int): How many timeouts the away team has (1, 2, or 3)
+
+posteam_score (int): The score of the team on offense (e.g. 27 if the team with possession has 27 points)
+
+defteam_score (int): The score of the team on defense (e.g. 23 if the team on defnse has 23 points)
+
+score_differential (int): The score different between the team on offense and the team on defense (e.g. -4 if the score is 23-27)
+
+wind (int): miles per hour of the wind before the ball is snapped (e.g. 31 if the wind is blowing at 31 mph)
+
+temp (int): temperature in farenhit  before the ball is snapped (e.g. 76 if the temperature if 76 degrees F)
+
+go_for_it (fctr): Gives 1 if the team decides to go for the 4th down conversion, gives a 0 if the team does not go for (This is what we will be predicting)
+
+home (fctr): Gives 1 if the team with possession is at home, gives a 0 if the team is on the road 
